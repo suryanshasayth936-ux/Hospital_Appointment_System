@@ -1,27 +1,11 @@
+
 const Patient = require("../models/Patient");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const generateToken = (id) => {
-  return jwt.sign(
-    { id },
-    process.env.JWT_SECRET || "supersecretjwtkey_hospital_app_12345",
-    { expiresIn: "7d" }
-  );
-};
-
 const registerPatient = async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      dateOfBirth,
-      gender,
-      address,
-    } = req.body;
+    const { firstName, lastName, email, password, phone, dateOfBirth, gender, address } = req.body;
 
     if (
       !firstName?.trim() ||
@@ -33,6 +17,28 @@ const registerPatient = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "First name, last name, email, password, and phone are required",
+      });
+    }
+
+    if (!dateOfBirth) {
+      return res.status(400).json({
+        success: false,
+        message: "Date of birth is required",
+      });
+    }
+
+    const parsedDob = new Date(dateOfBirth);
+    if (Number.isNaN(parsedDob.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date of birth format",
+      });
+    }
+
+    if (!gender || !["Male", "Female", "Other"].includes(gender)) {
+      return res.status(400).json({
+        success: false,
+        message: "Gender is required and must be Male, Female, or Other",
       });
     }
 
@@ -50,7 +56,7 @@ const registerPatient = async (req, res) => {
     });
 
     if (existingPatient) {
-      return res.status(409).json({
+      return res.status(400).json({
         success: false,
         message: "A patient with this email already exists",
       });
@@ -58,21 +64,18 @@ const registerPatient = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const patientData = {
+    // Save the patient (without unmodeled 'name' property)
+    const patient = await Patient.create({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: normalizedEmail,
       password: hashedPassword,
       phone: phone.trim(),
-    };
+      dateOfBirth: parsedDob,
+      gender,
+      ...(address && { address: address.trim() }),
+    });
 
-    if (dateOfBirth) patientData.dateOfBirth = dateOfBirth;
-    if (gender) patientData.gender = gender;
-    if (address) patientData.address = address.trim();
-
-    const patient = await Patient.create(patientData);
-
-    const token = generateToken(patient._id);
     const patientResponse = patient.toObject();
     delete patientResponse.password;
 
@@ -80,20 +83,20 @@ const registerPatient = async (req, res) => {
       success: true,
       message: "Patient registered successfully",
       data: patientResponse,
-      token,
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({
+      return res.status(400).json({
         success: false,
         message: "A patient with this email already exists",
       });
     }
 
     if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((err) => err.message).join(", ");
       return res.status(400).json({
         success: false,
-        message: error.message,
+        message: messages || error.message,
       });
     }
 
@@ -135,21 +138,27 @@ const loginPatient = async (req, res) => {
       });
     }
 
-    const token = generateToken(patient._id);
+    const secret = process.env.JWT_SECRET || "supersecretjwtkey_hospital_app_12345";
+    const token = jwt.sign(
+      { id: patient._id, role: "patient" },
+      secret,
+      { expiresIn: "7d" }
+    );
+
     const patientResponse = patient.toObject();
     delete patientResponse.password;
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: patientResponse,
       token,
+      data: patientResponse,
     });
   } catch (error) {
     console.error("Patient login error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to login",
+      message: "Failed to log in",
     });
   }
 };
