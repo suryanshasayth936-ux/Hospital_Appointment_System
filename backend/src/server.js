@@ -3,34 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 
-// Route imports
+const authRoutes = require('./routes/authRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 
-// Middleware imports
 const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
 
-// Database connection
 connectDB();
 
-// Global Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Base API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/patients', patientRoutes);
 
-// Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Hospital Appointment System API is running' });
+  res.status(200).json({
+    success: true,
+    status: 'ok',
+    message: 'Hospital Appointment System API is running',
+  });
 });
 
-// Global Error Handling Middleware (must be after all routes)
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
