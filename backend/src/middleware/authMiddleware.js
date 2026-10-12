@@ -4,7 +4,6 @@ const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    // 1. Check if Authorization header exists and follows 'Bearer <token>' format
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
@@ -12,7 +11,6 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    // 2. Extract token
     const token = authHeader.split(' ')[1];
 
     if (!token) {
@@ -22,13 +20,19 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    // 3. Verify token with JWT_SECRET
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error('Server Configuration Error: JWT_SECRET is not defined in environment variables.');
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication service misconfigured: JWT_SECRET is not defined',
+      });
+    }
 
-    // 4. Attach decoded payload to request object
+    const decoded = jwt.verify(token, secret);
+
     req.user = decoded;
 
-    // 5. Proceed to next middleware/controller
     next();
   } catch (error) {
     return res.status(401).json({
