@@ -434,6 +434,7 @@ const cancelAppointment = async (req, res) => {
       });
     }
 
+    // Ownership check: Verify logged-in user owns the appointment
     const userId = req.user?.id || req.user?._id;
     if (userId && appointment.patient.toString() !== userId.toString() && req.user?.role !== "admin") {
       return res.status(403).json({

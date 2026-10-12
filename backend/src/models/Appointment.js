@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const appointmentSchema = new mongoose.Schema(
@@ -34,6 +33,15 @@ const appointmentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+  }
+);
+
+appointmentSchema.index({ patient: 1, appointmentDate: 1 });
+appointmentSchema.index(
+  { doctor: 1, appointmentDate: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: "Scheduled" },
   }
 );
 
